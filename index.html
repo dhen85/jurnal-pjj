@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jurnal Belajar PJJ - Kelas IX-D (Production)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        
+        /* Z-Index Hierarchy Wajib */
+        #loading-overlay { z-index: 9999; }
+        #toast-container { z-index: 2000; }
+        .modal-overlay { z-index: 1000; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%;
+            background: #ffffff; border: 2px solid #3b82f6; cursor: pointer; margin-top: -8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #e2e8f0; border-radius: 3px; }
+        .progress-bar-track { transition: width 0.3s ease, background-color 0.3s ease; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased overflow-x-hidden">
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm hidden flex-col justify-center items-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-3"></div>
+        <p id="loading-text" class="text-blue-700 font-medium">Memproses data...</p>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="fixed top-4 right-4 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- GLOBAL MODAL -->
+    <div id="global-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center modal-overlay opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform scale-95 transition-transform duration-300" id="modal-content-box">
+            <h3 id="modal-title" class="text-xl font-bold mb-2 text-gray-800">Title</h3>
+            <div id="modal-body" class="text-gray-600 mb-6 max-h-[60vh] overflow-y-auto pr-2">Body</div>
+            <div id="modal-actions" class="flex justify-end gap-3">
+                <button id="modal-btn-cancel" class="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium">Batal</button>
+                <button id="modal-btn-confirm" class="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium">Konfirmasi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- IMAGE VIEWER MODAL -->
+    <div id="image-modal" class="fixed inset-0 bg-black/90 hidden flex items-center justify-center modal-overlay">
+        <button onclick="closeImageModal()" class="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl">&times;</button>
+        <img id="viewer-img" src="" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl p-4">
+    </div>
+
+    <!-- LOGIN SECTION -->
+    <section id="login-section" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 border border-gray-100">
+            <div class="text-center mb-8">
+                <div class="bg-blue-100 text-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-book-open text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800">Jurnal Belajar PJJ</h1>
+                <p class="text-gray-500 text-sm mt-1">SMP Negeri 2 Ende - Kelas IX-D</p>
+            </div>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Username / NIS</label>
+                    <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" required placeholder="Masukkan username">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <i class="fas fa-sign-in-alt"></i> Masuk
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- APP CONTAINER -->
+    <section id="app-container" class="hidden min-h-screen flex flex-col">
+        <header class="bg-white shadow-sm border-b sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-book-reader text-blue-600 text-xl"></i>
+                    <span class="font-bold text-lg hidden sm:block">Jurnal IX-D</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <p id="nav-user-name" class="text-sm font-bold text-gray-800">Nama User</p>
+                        <p id="nav-user-role" class="text-xs text-gray-500 capitalize">Role</p>
+                    </div>
+                    <button onclick="confirmLogout()" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-colors" title="Logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex flex-col md:flex-row gap-6">
+            <aside class="w-full md:w-64 flex-shrink-0">
+                <nav class="bg-white rounded-xl shadow-sm border border-gray-100 p-2 flex flex-row md:flex-col gap-1 overflow-x-auto" id="sidebar-menu">
+                </nav>
+            </aside>
+            <div id="view-container" class="flex-grow bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 min-h-[500px]">
+            </div>
+        </main>
+    </section>
+
+    <script>
+        /**
+         * ============================================================
+         * WAJIB DIUBAH!
+         * Ganti URL di bawah dengan URL Web App Apps Script Anda 
+         * setelah di-deploy.
+         * ============================================================
+         */
+        const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLamytNjZJ_0NGO5l7-UB3iBJQak-QErWqd6dQ-whlsQENXi1TdaiKwEYYZJ3966fL/exec"; // CONTOH URL. GANTI SETELAH DEPLOY!
+
+        let currentUser = null;
+        let sessionToken = null;
+        let currentTab = '';
+        let currentFilterMapel = ''; 
+        
+        let dbJournals = [];
+        let dbTasks = [];
+
+        /**
+         * ==========================================
+         * CORE API SERVICE
+         * ==========================================
+         */
+        async function fetchAPI(action, payload = {}) {
+            try {
+                if (sessionToken) payload.sessionToken = sessionToken;
+                
+                const response = await fetch(APP_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: action, payload: payload })
+                });
+                
+                const result = await response.json();
+                if (!result.success) throw new Error(result.message);
+                return result.data;
+            } catch (error) {
+                console.error("API Error:", error);
+                throw error;
+            }
+        }
+
+        /**
+         * ==========================================
+         * UTILITIES UI
+         * ==========================================
+         */
+        function showLoading(text = 'Memproses data...') {
+            document.getElementById('loading-text').innerText = text;
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            document.getElementById('loading-overlay').classList.add('flex');
+        }
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('loading-overlay').classList.remove('flex');
+        }
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let bgClass = type === 'success' ? 'bg-green-600' : (type === 'error' ? 'bg-red-600' : 'bg-blue-600');
+            let icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle');
+
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto mt-2`;
+            toast.innerHTML = `<i class="fas ${icon}"></i> <span class="font-medium text-sm">${message}</span>`;
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.remove('translate-x-full', 'opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        let modalConfirmCallback = null;
+        function showModal({ title, body, confirmText = 'Konfirmasi', confirmColor = 'bg-blue-600', cancelText = 'Batal', onConfirm }) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerHTML = body;
+            const btnConfirm = document.getElementById('modal-btn-confirm');
+            btnConfirm.innerText = confirmText;
+            btnConfirm.className = `px-4 py-2 text-white ${confirmColor} hover:opacity-90 rounded-lg transition-colors font-medium`;
+            document.getElementById('modal-btn-cancel').innerText = cancelText;
+            const modal = document.getElementById('global-modal');
+            const content = document.getElementById('modal-content-box');
+            modal.classList.remove('hidden'); void modal.offsetWidth;
+            modal.classList.remove('opacity-0'); content.classList.remove('scale-95'); content.classList.add('scale-100');
+            modalConfirmCallback = onConfirm;
+        }
+        function hideModal() {
+            const modal = document.getElementById('global-modal');
+            const content = document.getElementById('modal-content-box');
+            modal.classList.add('opacity-0'); content.classList.remove('scale-100'); content.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+        document.getElementById('modal-btn-cancel').addEventListener('click', hideModal);
+        document.getElementById('modal-btn-confirm').addEventListener('click', () => { if(modalConfirmCallback) modalConfirmCallback(); });
+
+        function viewImage(url) {
+            document.getElementById('viewer-img').src = url;
+            document.getElementById('image-modal').classList.remove('hidden');
+        }
+        function closeImageModal() {
+            document.getElementById('image-modal').classList.add('hidden');
+            document.getElementById('viewer-img').src = '';
+        }
+
+        /**
+         * ==========================================
+         * AUTHENTICATION & INITIALIZATION
+         * ==========================================
+         */
+        async function handleLogin(e) {
+            e.preventDefault();
+            const userIn = document.getElementById('username').value;
+            const passIn = document.getElementById('password').value;
+
+            showLoading('Memverifikasi...');
+            try {
+                const data = await fetchAPI('login', { username: userIn, password: passIn });
+                currentUser = data.user;
+                sessionToken = data.token;
+                initApp();
+                showToast(`Selamat datang, ${currentUser.nama}`, 'success');
+            } catch (err) {
+                showToast(err.message || 'Gagal login', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function confirmLogout() {
+            showModal({
+                title: 'Konfirmasi Logout',
+                body: 'Apakah Anda yakin ingin keluar dari aplikasi?',
+                confirmText: 'Logout',
+                confirmColor: 'bg-red-600',
+                onConfirm: () => {
+                    hideModal();
+                    currentUser = null; sessionToken = null;
+                    document.getElementById('login-section').classList.remove('hidden');
+                    document.getElementById('app-container').classList.add('hidden');
+                    document.getElementById('login-form').reset();
+                    showToast('Berhasil logout', 'success');
+                }
+            });
+        }
+
+        function initApp() {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+            document.getElementById('nav-user-name').innerText = currentUser.nama;
+            document.getElementById('nav-user-role').innerText = currentUser.role;
+
+            const menuContainer = document.getElementById('sidebar-menu');
+            menuContainer.innerHTML = '';
+            const menus = [];
+            
+            if (currentUser.role === 'siswa') {
+                menus.push({ id: 'jurnal', icon: 'fa-edit', label: 'Jurnal Saya' });
+                menus.push({ id: 'tugas', icon: 'fa-clipboard-list', label: 'Tugas Kelas' });
+            } else if (currentUser.role === 'guru' || currentUser.role === 'admin') {
+                menus.push({ id: 'rekap', icon: 'fa-table', label: 'Rekap Jurnal' });
+                menus.push({ id: 'tugas', icon: 'fa-clipboard-list', label: 'Tugas Kelas' });
+                if(currentUser.role === 'admin') menus.push({ id: 'akun', icon: 'fa-users', label: 'Kelola Akun' });
+            }
+
+            menus.forEach((m, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-3 tab-btn`;
+                btn.innerHTML = `<i class="fas ${m.icon} w-5 text-center"></i> <span>${m.label}</span>`;
+                btn.onclick = () => switchTab(m.id, btn);
+                menuContainer.appendChild(btn);
+                if(idx === 0) switchTab(m.id, btn);
+            });
+        }
+
+        async function switchTab(tabId, btnElement) {
+            currentTab = tabId;
+            currentFilterMapel = '';
+            
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-blue-50', 'text-blue-700');
+                b.classList.add('text-gray-600', 'hover:bg-gray-50');
+            });
+            btnElement.classList.add('bg-blue-50', 'text-blue-700');
+            btnElement.classList.remove('text-gray-600', 'hover:bg-gray-50');
+
+            await loadDataForTab();
+        }
+
+        async function loadDataForTab() {
+            showLoading('Mengambil data terbaru...');
+            try {
+                if (currentTab === 'jurnal' && currentUser.role === 'siswa') {
+                    dbJournals = await fetchAPI('get_my_journals');
+                    renderJurnalSiswa();
+                } else if (currentTab === 'rekap') {
+                    dbJournals = await fetchAPI('get_all_journals');
+                    renderRekapJurnal();
+                } else if (currentTab === 'tugas') {
+                    dbTasks = await fetchAPI('get_tasks');
+                    renderTugasKelas();
+                } else if (currentTab === 'akun') {
+                    renderAkun();
+                }
+            } catch (err) {
+                showToast('Gagal memuat data: ' + err.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        /**
+         * ==========================================
+         * FILE HANDLING UTILITIES
+         * ==========================================
+         */
+        function getBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        /**
+         * ==========================================
+         * RENDER VIEWS
+         * ==========================================
+         */
+        function renderJurnalSiswa() {
+            const container = document.getElementById('view-container');
+            container.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Jurnal Belajarku</h2>
+                        <p class="text-sm text-gray-500">Catat aktivitas belajarmu hari ini.</p>
+                    </div>
+                    <button onclick="openFormJurnal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                        <i class="fas fa-plus mr-1"></i> Isi Jurnal Baru
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    ${dbJournals.length === 0 ? `<div class="text-center p-8 bg-gray-50 rounded-lg border border-dashed"><p class="text-gray-500">Belum ada catatan jurnal.</p></div>` : ''}
+                    ${dbJournals.map(j => `
+                        <div class="border rounded-xl p-4 sm:p-5 bg-white shadow-sm hover:shadow transition-shadow">
+                            <div class="flex flex-col sm:flex-row justify-between gap-4">
+                                <div class="flex-grow">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded">${j.mapel}</span>
+                                        <span class="text-xs text-gray-500"><i class="far fa-calendar-alt"></i> ${j.tanggal}</span>
+                                    </div>
+                                    <h3 class="font-bold text-gray-800 text-lg">${j.materi}</h3>
+                                    <div class="mt-3">
+                                        <div class="flex justify-between text-xs mb-1">
+                                            <span class="text-gray-600">Tingkat Pemahaman</span>
+                                            <span class="font-bold text-gray-800">${j.pemahaman}%</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div class="h-2 rounded-full ${getScoreColorClass(j.pemahaman)}" style="width: ${j.pemahaman}%"></div>
+                                        </div>
+                                    </div>
+                                    ${j.komentar ? `
+                                        <div class="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                            <p class="text-xs font-semibold text-yellow-800 mb-1"><i class="fas fa-comment-dots"></i> Komentar Wali Kelas:</p>
+                                            <p class="text-sm text-gray-700 italic">"${j.komentar}"</p>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <div class="flex-shrink-0 sm:w-32">
+                                    <p class="text-xs text-gray-500 mb-1">Bukti Belajar:</p>
+                                    <img src="${j.foto}" onerror="this.src='https://placehold.co/600x400/eeeeee/999999?text=Gambar+Gagal+Dimuat'" onclick="viewImage('${j.foto}')" class="w-full h-24 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity" alt="Bukti">
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function openFormJurnal() {
+            const today = new Date().toISOString().split('T')[0];
+            showModal({
+                title: 'Isi Jurnal Baru',
+                body: `
+                    <form id="form-tambah-jurnal" class="space-y-4">
+                        <div><label class="block text-sm text-gray-700 mb-1">Tanggal</label>
+                        <input type="date" id="j-tanggal" value="${today}" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">Mata Pelajaran</label>
+                        <select id="j-mapel" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required>
+                            <option value="">Pilih Mata Pelajaran...</option>
+                            <option value="Matematika">Matematika</option>
+                            <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                            <option value="Bahasa Inggris">Bahasa Inggris</option>
+                            <option value="IPA">IPA</option>
+                            <option value="IPS">IPS</option>
+                        </select></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">Materi yang dipelajari</label>
+                        <textarea id="j-materi" rows="2" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Contoh: Belajar rumus phytagoras"></textarea></div>
+                        <div>
+                            <div class="flex justify-between"><label class="block text-sm text-gray-700 mb-1">Tingkat Pemahaman</label><span id="j-val" class="text-sm font-bold text-blue-600">50%</span></div>
+                            <div class="relative pt-1"><div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
+                                <div id="j-track" style="width: 50%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-yellow-400 progress-bar-track"></div>
+                            </div>
+                            <input type="range" id="j-pemahaman" min="1" max="100" value="50" class="absolute top-0 w-full opacity-0 cursor-pointer h-full" oninput="updateSliderUI(this.value)"></div>
+                        </div>
+                        <div><label class="block text-sm text-gray-700 mb-1">Foto Bukti Belajar (Max 2MB)</label>
+                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors">
+                                <input type="file" id="j-foto" accept="image/*" class="hidden" onchange="document.getElementById('file-name').innerText = this.files[0].name" required>
+                                <label for="j-foto" class="cursor-pointer flex flex-col items-center">
+                                    <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-2"></i>
+                                    <span class="text-sm text-blue-600 font-medium">Klik untuk pilih file</span>
+                                    <span id="file-name" class="text-xs text-gray-500 mt-1">Belum ada file dipilih</span>
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                `,
+                confirmText: 'Kirim Jurnal',
+                onConfirm: async () => {
+                    const tgl = document.getElementById('j-tanggal').value;
+                    const mpl = document.getElementById('j-mapel').value;
+                    const mtr = document.getElementById('j-materi').value;
+                    const phm = document.getElementById('j-pemahaman').value;
+                    const ftoInput = document.getElementById('j-foto');
+
+                    if(!tgl || !mpl || !mtr || ftoInput.files.length === 0) {
+                        showToast('Harap lengkapi semua form dan unggah foto!', 'error');
+                        return;
+                    }
+
+                    const file = ftoInput.files[0];
+                    if (file.size > 2 * 1024 * 1024) { showToast('Ukuran file maksimal 2MB!', 'error'); return; }
+
+                    hideModal();
+                    showLoading('Menyimpan Jurnal & Mengunggah Foto ke Drive...');
+                    
+                    try {
+                        const base64String = await getBase64(file);
+                        const payload = {
+                            tanggal: tgl, mapel: mpl, materi: mtr, pemahaman: phm,
+                            filename: file.name, mimeType: file.type, base64: base64String
+                        };
+                        
+                        await fetchAPI('save_journal', payload);
+                        showToast('Jurnal dan bukti berhasil disimpan!', 'success');
+                        loadDataForTab(); // Refresh data
+                    } catch (err) {
+                        showToast('Gagal menyimpan jurnal: ' + err.message, 'error');
+                        hideLoading();
+                    }
+                }
+            });
+        }
+
+        function updateSliderUI(val) {
+            document.getElementById('j-val').innerText = val + '%';
+            const track = document.getElementById('j-track');
+            track.style.width = val + '%';
+            if(val <= 33) track.className = 'shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-500 progress-bar-track';
+            else if(val <= 66) track.className = 'shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-yellow-400 progress-bar-track';
+            else track.className = 'shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500 progress-bar-track';
+        }
+        function getScoreColorClass(val) {
+            if(val <= 33) return 'bg-red-500';
+            if(val <= 66) return 'bg-yellow-400';
+            return 'bg-green-500';
+        }
+
+        function renderRekapJurnal() {
+            const container = document.getElementById('view-container');
+            let filteredJournals = dbJournals;
+            if (currentFilterMapel !== '') filteredJournals = dbJournals.filter(j => j.mapel === currentFilterMapel);
+
+            container.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Rekap Jurnal Siswa</h2>
+                        <p class="text-sm text-gray-500">Seluruh data jurnal kelas IX-D</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                        <select onchange="applyFilterMapel(this.value)" class="w-full sm:w-auto bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                            <option value="">Semua Mata Pelajaran</option>
+                            <option value="Matematika" ${currentFilterMapel === 'Matematika' ? 'selected' : ''}>Matematika</option>
+                            <option value="Bahasa Indonesia" ${currentFilterMapel === 'Bahasa Indonesia' ? 'selected' : ''}>Bahasa Indonesia</option>
+                            <option value="Bahasa Inggris" ${currentFilterMapel === 'Bahasa Inggris' ? 'selected' : ''}>Bahasa Inggris</option>
+                            <option value="IPA" ${currentFilterMapel === 'IPA' ? 'selected' : ''}>IPA</option>
+                            <option value="IPS" ${currentFilterMapel === 'IPS' ? 'selected' : ''}>IPS</option>
+                        </select>
+                        <button onclick="exportToPDF()" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 whitespace-nowrap">
+                            <i class="fas fa-file-pdf"></i> Download PDF
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3">Tanggal</th>
+                                <th class="px-4 py-3">Nama Siswa</th>
+                                <th class="px-4 py-3">Mata Pelajaran</th>
+                                <th class="px-4 py-3">Pemahaman</th>
+                                <th class="px-4 py-3">Bukti</th>
+                                <th class="px-4 py-3">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredJournals.length === 0 ? `<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">Tidak ada data untuk filter ini.</td></tr>` : ''}
+                            ${filteredJournals.map(j => `
+                                <tr class="bg-white border-b hover:bg-gray-50">
+                                    <td class="px-4 py-3 whitespace-nowrap">${j.tanggal}</td>
+                                    <td class="px-4 py-3 font-medium text-gray-900">${j.nama_siswa}</td>
+                                    <td class="px-4 py-3">
+                                        <div class="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded inline-block mb-1">${j.mapel}</div>
+                                        <div class="text-gray-500 truncate max-w-[150px]" title="${j.materi}">${j.materi}</div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-16 bg-gray-200 rounded-full h-1.5"><div class="h-1.5 rounded-full ${getScoreColorClass(j.pemahaman)}" style="width: ${j.pemahaman}%"></div></div>
+                                            <span class="text-xs font-bold">${j.pemahaman}%</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button onclick="viewImage('${j.foto}')" class="text-blue-600 hover:underline text-xs"><i class="fas fa-image"></i> Lihat</button>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button onclick="beriKomentar('${j.id}')" class="text-xs ${j.komentar ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} px-2 py-1 rounded transition-colors">
+                                            ${j.komentar ? '<i class="fas fa-check"></i> Dinilai' : 'Komentar'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function applyFilterMapel(val) {
+            currentFilterMapel = val;
+            renderRekapJurnal(); 
+        }
+
+        function beriKomentar(jurnalId) {
+            const jurnal = dbJournals.find(j => j.id === jurnalId);
+            showModal({
+                title: 'Beri Komentar',
+                body: `
+                    <div class="mb-3 text-sm bg-gray-50 p-3 rounded border">
+                        <p><strong>Siswa:</strong> ${jurnal.nama_siswa}</p>
+                        <p><strong>Materi:</strong> ${jurnal.materi}</p>
+                    </div>
+                    <textarea id="input-komentar" rows="3" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" placeholder="Ketik umpan balik untuk siswa...">${jurnal.komentar || ''}</textarea>
+                `,
+                confirmText: 'Simpan',
+                onConfirm: async () => {
+                    const kom = document.getElementById('input-komentar').value;
+                    hideModal();
+                    showLoading('Menyimpan komentar...');
+                    try {
+                        await fetchAPI('update_comment', { id_jurnal: jurnalId, komentar: kom });
+                        showToast('Komentar berhasil disimpan', 'success');
+                        loadDataForTab(); // Refresh
+                    } catch (err) {
+                        showToast('Gagal: ' + err.message, 'error');
+                        hideLoading();
+                    }
+                }
+            });
+        }
+
+        function exportToPDF() {
+            showLoading('Membuat File PDF...');
+            setTimeout(() => {
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+
+                    let exportData = dbJournals;
+                    let titleSuffix = "";
+                    if (currentFilterMapel !== '') {
+                        exportData = dbJournals.filter(j => j.mapel === currentFilterMapel);
+                        titleSuffix = ` - ${currentFilterMapel}`;
+                    }
+
+                    doc.setFontSize(16);
+                    doc.text(`Rekap Jurnal Belajar${titleSuffix}`, 14, 15);
+                    doc.setFontSize(11);
+                    doc.text("Kelas: IX-D | SMP Negeri 2 Ende", 14, 22);
+                    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 28);
+
+                    const tableData = exportData.map(j => [j.tanggal, j.nama_siswa, j.mapel, j.materi, `${j.pemahaman}%`, j.komentar || '-']);
+                    doc.autoTable({
+                        startY: 35, head: [['Tanggal', 'Nama Siswa', 'Mapel', 'Materi', 'Pemahaman', 'Komentar']],
+                        body: tableData, theme: 'grid', styles: { fontSize: 9 }, headStyles: { fillColor: [37, 99, 235] }
+                    });
+                    doc.save(`Rekap_Jurnal${titleSuffix ? '_' + currentFilterMapel : ''}.pdf`);
+                    showToast('File PDF berhasil diunduh', 'success');
+                } catch (err) {
+                    showToast('Gagal membuat PDF', 'error');
+                } finally {
+                    hideLoading();
+                }
+            }, 500);
+        }
+
+        function renderTugasKelas() {
+            const container = document.getElementById('view-container');
+            const isAdmin = currentUser.role === 'admin' || currentUser.role === 'guru';
+            
+            container.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Tugas Kelas</h2>
+                        <p class="text-sm text-gray-500">Informasi dan instruksi tugas harian</p>
+                    </div>
+                    ${isAdmin ? `
+                    <button onclick="openFormTugas()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                        <i class="fas fa-plus mr-1"></i> Tambah Tugas
+                    </button>
+                    ` : ''}
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${dbTasks.length === 0 ? `<div class="col-span-full text-center p-8 bg-gray-50 rounded-lg border border-dashed"><p class="text-gray-500">Belum ada tugas saat ini.</p></div>` : ''}
+                    ${dbTasks.map(t => `
+                        <div class="border rounded-xl p-5 bg-white shadow-sm border-l-4 border-l-blue-500 relative flex flex-col h-full">
+                            ${isAdmin ? `
+                            <button onclick="hapusTugas('${t.id}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors" title="Hapus Tugas">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            ` : ''}
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="text-xs font-semibold px-2 py-1 bg-gray-100 text-gray-700 rounded"><i class="far fa-calendar-alt"></i> ${t.tanggal}</span>
+                                <span class="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded">${t.mapel}</span>
+                            </div>
+                            <h3 class="font-bold text-gray-800 mb-2">${t.judul}</h3>
+                            <p class="text-sm text-gray-600 mb-4 flex-grow whitespace-pre-line">${t.instruksi}</p>
+                            
+                            <div class="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
+                                <span class="text-xs font-bold text-green-600"><i class="fas fa-circle text-[8px] align-middle mr-1"></i> Aktif</span>
+                                ${t.lampiran ? `
+                                <a href="${t.lampiran}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
+                                    <i class="fas fa-paperclip"></i> Lihat Lampiran
+                                </a>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function openFormTugas() {
+            showModal({
+                title: 'Tambah Tugas Baru',
+                body: `
+                    <form id="form-tambah-tugas" class="space-y-4">
+                        <div><label class="block text-sm text-gray-700 mb-1">Tanggal</label>
+                        <input type="date" id="t-tanggal" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">Mata Pelajaran</label>
+                        <select id="t-mapel" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required>
+                            <option value="">Pilih Mata Pelajaran...</option>
+                            <option value="Matematika">Matematika</option>
+                            <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                            <option value="Bahasa Inggris">Bahasa Inggris</option>
+                            <option value="IPA">IPA</option>
+                            <option value="IPS">IPS</option>
+                        </select></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">Judul Tugas</label>
+                        <input type="text" id="t-judul" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Cth: Latihan Halaman 12"></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">Instruksi</label>
+                        <textarea id="t-instruksi" rows="3" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Berikan instruksi detail kepada siswa..."></textarea></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">File Lampiran PDF/Gambar (Opsional, Max 2MB)</label>
+                        <div class="border border-gray-300 rounded-lg p-2 flex items-center gap-2 bg-gray-50">
+                            <input type="file" id="t-file" accept=".pdf,image/*" class="text-sm w-full file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                        </div></div>
+                    </form>
+                `,
+                confirmText: 'Simpan Tugas',
+                onConfirm: async () => {
+                    const tgl = document.getElementById('t-tanggal').value;
+                    const mpl = document.getElementById('t-mapel').value;
+                    const jdl = document.getElementById('t-judul').value;
+                    const ins = document.getElementById('t-instruksi').value;
+                    const fileInput = document.getElementById('t-file');
+
+                    if(!tgl || !mpl || !jdl || !ins) { showToast('Harap lengkapi semua form wajib!', 'error'); return; }
+
+                    let base64String = null, filename = null, mimeType = null;
+                    if(fileInput.files.length > 0) {
+                        const file = fileInput.files[0];
+                        if (file.size > 2 * 1024 * 1024) { showToast('Ukuran file maksimal 2MB!', 'error'); return; }
+                        base64String = await getBase64(file);
+                        filename = file.name;
+                        mimeType = file.type;
+                    }
+
+                    hideModal();
+                    showLoading(base64String ? 'Menyimpan tugas dan upload lampiran...' : 'Menyimpan tugas...');
+                    
+                    try {
+                        await fetchAPI('save_task', {
+                            tanggal: tgl, mapel: mpl, judul: jdl, instruksi: ins,
+                            filename: filename, mimeType: mimeType, base64: base64String
+                        });
+                        showToast('Tugas berhasil ditambahkan', 'success');
+                        loadDataForTab();
+                    } catch (err) {
+                        showToast('Gagal menyimpan tugas: ' + err.message, 'error');
+                        hideLoading();
+                    }
+                }
+            });
+        }
+
+        function hapusTugas(id) {
+            showModal({
+                title: 'Hapus Tugas',
+                body: 'Apakah Anda yakin ingin menghapus tugas ini secara permanen?',
+                confirmText: 'Ya, Hapus',
+                confirmColor: 'bg-red-600',
+                onConfirm: async () => {
+                    hideModal();
+                    showLoading('Menghapus...');
+                    try {
+                        await fetchAPI('delete_task', { id_tugas: id });
+                        showToast('Tugas berhasil dihapus', 'success');
+                        loadDataForTab();
+                    } catch (err) {
+                        showToast('Gagal menghapus: ' + err.message, 'error');
+                        hideLoading();
+                    }
+                }
+            });
+        }
+
+        function renderAkun() {
+            const container = document.getElementById('view-container');
+            container.innerHTML = `
+                <div class="text-center py-12">
+                    <i class="fas fa-tools text-6xl text-gray-300 mb-4"></i>
+                    <h2 class="text-xl font-bold text-gray-700">Modul Kelola Akun</h2>
+                    <p class="text-gray-500 max-w-md mx-auto mt-2">Untuk pengelolaan User (Siswa/Guru), silakan kelola langsung secara terpusat melalui Google Sheets Anda di tab <strong>Users</strong> untuk performa yang lebih aman dan mudah direkapitulasi secara massal.</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
