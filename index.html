@@ -11,7 +11,6 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    <!-- Library SheetJS untuk membaca dan membuat Excel di sisi klien -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
@@ -48,7 +47,7 @@
     <div id="global-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center modal-overlay opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform scale-95 transition-transform duration-300" id="modal-content-box">
             <h3 id="modal-title" class="text-xl font-bold mb-2 text-gray-800">Title</h3>
-            <div id="modal-body" class="text-gray-600 mb-6 max-h-[60vh] overflow-y-auto pr-2">Body</div>
+            <div id="modal-body" class="text-gray-600 mb-6 max-h-[70vh] overflow-y-auto pr-2">Body</div>
             <div id="modal-actions" class="flex justify-end gap-3">
                 <button id="modal-btn-cancel" class="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium">Batal</button>
                 <button id="modal-btn-confirm" class="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium">Konfirmasi</button>
@@ -75,7 +74,7 @@
             <form id="login-form" onsubmit="handleLogin(event)">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Username / NIS</label>
-                    <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" required placeholder="Masukkan username">
+                    <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" required placeholder="Masukkan username atau NIS">
                 </div>
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -125,7 +124,7 @@
          * Ganti URL di bawah dengan URL Web App Apps Script Anda 
          * ============================================================
          */
-        const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyC4LqZcQ5B8Q-zY_G0P-r6Cg7r5QpS9O5L2E_aN7sXW-M8VjF4K6P9lU-H1x8zC-bFhw/exec"; 
+        const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbykUjvjWqTZw5S_KI0Gxtbn70NvMyC36w_xx57UU35ILGXaDVVIfW40TgCBFZ0wSvaI/exec"; // GANTI URL INI
 
         let currentUser = null;
         let sessionToken = null;
@@ -135,6 +134,31 @@
         let dbJournals = [];
         let dbTasks = [];
         let dbUsers = []; 
+
+        // State untuk Paginasi
+        const ITEMS_PER_PAGE = 10;
+        let pageJurnal = 1;
+        let pageTugas = 1;
+        let pageAkun = 1;
+
+        // --- SISTEM DEMO OFFLINE (FALLBACK) ---
+        // Jika Apps Script gagal/belum di-setting, aplikasi akan menjalankan mode ini agar bisa di-preview.
+        function mockAPI(action, payload) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    if (action === 'login') {
+                        let userRole = payload.username.toLowerCase();
+                        if(userRole.includes('admin')) resolve({ token: 'demo', user: { id: 'U1', username: 'admin', role: 'admin', nama: 'Administrator (Demo)' } });
+                        else if(userRole.includes('guru')) resolve({ token: 'demo', user: { id: 'U2', username: 'guru', role: 'guru', nama: 'Bapak Guru (Demo)', mapel: 'IPA' } });
+                        else resolve({ token: 'demo', user: { id: 'U3', username: 'siswa', role: 'siswa', nama: 'Siswa (Demo)', nis: '1001' } });
+                    }
+                    else if (action === 'get_my_journals' || action === 'get_all_journals') resolve(dbJournals || []);
+                    else if (action === 'get_tasks') resolve(dbTasks || []);
+                    else if (action === 'get_users') resolve(dbUsers || []);
+                    else resolve({});
+                }, 600);
+            });
+        }
 
         async function fetchAPI(action, payload = {}) {
             try {
@@ -150,7 +174,16 @@
                 if (!result.success) throw new Error(result.message);
                 return result.data;
             } catch (error) {
-                console.error("API Error:", error);
+                console.warn("⚠️ API tidak terhubung. Mengalihkan ke Mode Demo Sementara.");
+                
+                // Menangkap error "Failed to fetch" dan mengalihkan ke Mock API
+                if (error.message.includes("Failed to fetch") || error.name === "TypeError") {
+                    if (action === 'login') {
+                        showToast("API Belum Disetting! Mode Demo Diaktifkan.", "info");
+                    }
+                    return mockAPI(action, payload);
+                }
+                
                 throw error;
             }
         }
@@ -248,11 +281,25 @@
             });
         }
 
+        // Helper Paginasi UI
+        function renderPaginationUI(totalItems, currentPage, funcName) {
+            if(totalItems <= ITEMS_PER_PAGE) return '';
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            let btns = '';
+            for(let i = 1; i <= totalPages; i++) {
+                btns += `<button onclick="${funcName}(${i})" class="px-3 py-1.5 text-sm border font-medium transition-colors ${i === currentPage ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'} ${i===1?'rounded-l-md':''} ${i===totalPages?'rounded-r-md':''}">${i}</button>`;
+            }
+            return `<div class="flex justify-between items-center mt-4 border-t pt-4">
+                        <span class="text-sm text-gray-500">Menampilkan halaman ${currentPage} dari ${totalPages} (Total: ${totalItems})</span>
+                        <div class="flex rounded-md shadow-sm -space-x-px">${btns}</div>
+                    </div>`;
+        }
+
         function initApp() {
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('app-container').classList.remove('hidden');
             document.getElementById('nav-user-name').innerText = currentUser.nama;
-            document.getElementById('nav-user-role').innerText = currentUser.role;
+            document.getElementById('nav-user-role').innerText = currentUser.role === 'guru' ? `Guru (${currentUser.mapel})` : currentUser.role;
 
             const menuContainer = document.getElementById('sidebar-menu');
             menuContainer.innerHTML = '';
@@ -280,6 +327,7 @@
         async function switchTab(tabId, btnElement) {
             currentTab = tabId;
             currentFilterMapel = '';
+            pageJurnal = 1; pageTugas = 1; pageAkun = 1; // Reset page saat pindah tab
             
             document.querySelectorAll('.tab-btn').forEach(b => {
                 b.classList.remove('bg-blue-50', 'text-blue-700');
@@ -331,7 +379,7 @@
                         <h2 class="text-xl font-bold text-gray-800">Jurnal Belajarku</h2>
                         <p class="text-sm text-gray-500">Catat aktivitas belajarmu hari ini.</p>
                     </div>
-                    <button onclick="openFormJurnal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                    <button onclick="openFormJurnal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
                         <i class="fas fa-plus mr-1"></i> Isi Jurnal Baru
                     </button>
                 </div>
@@ -464,26 +512,49 @@
             return 'bg-green-500';
         }
 
+        function gantiPageJurnal(page) {
+            pageJurnal = page;
+            renderRekapJurnal();
+        }
+
         function renderRekapJurnal() {
             const container = document.getElementById('view-container');
+            
+            // Logika Isolasi Guru vs Admin
             let filteredJournals = dbJournals;
-            if (currentFilterMapel !== '') filteredJournals = dbJournals.filter(j => j.mapel === currentFilterMapel);
+            if (currentUser.role === 'guru') {
+                // Guru hanya melihat mapel miliknya sendiri, dan dropdown filter disembunyikan
+                filteredJournals = dbJournals.filter(j => j.mapel === currentUser.mapel);
+            } else if (currentFilterMapel !== '') {
+                // Admin bisa memfilter semua mapel
+                filteredJournals = dbJournals.filter(j => j.mapel === currentFilterMapel);
+            }
+
+            // Hitung Paginasi
+            const startIndex = (pageJurnal - 1) * ITEMS_PER_PAGE;
+            const paginatedData = filteredJournals.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
             container.innerHTML = `
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800">Rekap Jurnal Siswa</h2>
-                        <p class="text-sm text-gray-500">Seluruh data jurnal kelas IX-D</p>
+                        <p class="text-sm text-gray-500">${currentUser.role === 'guru' ? `Data Jurnal khusus Mata Pelajaran: ${currentUser.mapel}` : 'Seluruh data jurnal kelas IX-D'}</p>
                     </div>
                     <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                        <select onchange="applyFilterMapel(this.value)" class="w-full sm:w-auto bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
-                            <option value="">Semua Mata Pelajaran</option>
-                            <option value="Matematika" ${currentFilterMapel === 'Matematika' ? 'selected' : ''}>Matematika</option>
-                            <option value="Bahasa Indonesia" ${currentFilterMapel === 'Bahasa Indonesia' ? 'selected' : ''}>Bahasa Indonesia</option>
-                            <option value="Bahasa Inggris" ${currentFilterMapel === 'Bahasa Inggris' ? 'selected' : ''}>Bahasa Inggris</option>
-                            <option value="IPA" ${currentFilterMapel === 'IPA' ? 'selected' : ''}>IPA</option>
-                            <option value="IPS" ${currentFilterMapel === 'IPS' ? 'selected' : ''}>IPS</option>
-                        </select>
+                        ${currentUser.role === 'admin' ? `
+                            <select onchange="applyFilterMapel(this.value)" class="w-full sm:w-auto bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                                <option value="">Semua Mata Pelajaran</option>
+                                <option value="Matematika" ${currentFilterMapel === 'Matematika' ? 'selected' : ''}>Matematika</option>
+                                <option value="Bahasa Indonesia" ${currentFilterMapel === 'Bahasa Indonesia' ? 'selected' : ''}>Bahasa Indonesia</option>
+                                <option value="Bahasa Inggris" ${currentFilterMapel === 'Bahasa Inggris' ? 'selected' : ''}>Bahasa Inggris</option>
+                                <option value="IPA" ${currentFilterMapel === 'IPA' ? 'selected' : ''}>IPA</option>
+                                <option value="IPS" ${currentFilterMapel === 'IPS' ? 'selected' : ''}>IPS</option>
+                            </select>
+                        ` : `
+                            <div class="w-full sm:w-auto bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm text-center">
+                                Mapel Anda: ${currentUser.mapel}
+                            </div>
+                        `}
                         <button onclick="exportToPDF()" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 whitespace-nowrap">
                             <i class="fas fa-file-pdf"></i> Download PDF
                         </button>
@@ -503,8 +574,8 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${filteredJournals.length === 0 ? `<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">Tidak ada data untuk filter ini.</td></tr>` : ''}
-                            ${filteredJournals.map(j => `
+                            ${paginatedData.length === 0 ? `<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">Tidak ada data untuk ditampilkan.</td></tr>` : ''}
+                            ${paginatedData.map(j => `
                                 <tr class="bg-white border-b hover:bg-gray-50">
                                     <td class="px-4 py-3 whitespace-nowrap">${j.tanggal}</td>
                                     <td class="px-4 py-3 font-medium text-gray-900">${j.nama_siswa}</td>
@@ -531,10 +602,15 @@
                         </tbody>
                     </table>
                 </div>
+                ${renderPaginationUI(filteredJournals.length, pageJurnal, 'gantiPageJurnal')}
             `;
         }
 
-        function applyFilterMapel(val) { currentFilterMapel = val; renderRekapJurnal(); }
+        function applyFilterMapel(val) { 
+            currentFilterMapel = val; 
+            pageJurnal = 1; // Reset halaman saat filter berubah
+            renderRekapJurnal(); 
+        }
 
         function beriKomentar(jurnalId) {
             const jurnal = dbJournals.find(j => j.id === jurnalId);
@@ -570,7 +646,11 @@
 
                     let exportData = dbJournals;
                     let titleSuffix = "";
-                    if (currentFilterMapel !== '') {
+                    
+                    if (currentUser.role === 'guru') {
+                        exportData = dbJournals.filter(j => j.mapel === currentUser.mapel);
+                        titleSuffix = ` - ${currentUser.mapel}`;
+                    } else if (currentFilterMapel !== '') {
                         exportData = dbJournals.filter(j => j.mapel === currentFilterMapel);
                         titleSuffix = ` - ${currentFilterMapel}`;
                     }
@@ -583,26 +663,42 @@
                         startY: 35, head: [['Tanggal', 'Nama Siswa', 'Mapel', 'Materi', 'Pemahaman', 'Komentar']],
                         body: tableData, theme: 'grid', styles: { fontSize: 9 }, headStyles: { fillColor: [37, 99, 235] }
                     });
-                    doc.save(`Rekap_Jurnal${titleSuffix ? '_' + currentFilterMapel : ''}.pdf`);
+                    doc.save(`Rekap_Jurnal${titleSuffix ? '_' + (currentUser.role === 'guru' ? currentUser.mapel : currentFilterMapel) : ''}.pdf`);
                     showToast('File PDF berhasil diunduh', 'success');
                 } catch (err) { showToast('Gagal membuat PDF', 'error'); } finally { hideLoading(); }
             }, 500);
         }
 
+        function gantiPageTugas(page) {
+            pageTugas = page;
+            renderTugasKelas();
+        }
+
         function renderTugasKelas() {
             const container = document.getElementById('view-container');
             const isAdmin = currentUser.role === 'admin' || currentUser.role === 'guru';
+            
+            // Logika filter: Guru hanya melihat tugas Mapelnya. Siswa/Admin melihat semua.
+            let filteredTasks = dbTasks;
+            if (currentUser.role === 'guru') {
+                filteredTasks = dbTasks.filter(t => t.mapel === currentUser.mapel);
+            }
+
+            // Hitung Paginasi
+            const startIndex = (pageTugas - 1) * ITEMS_PER_PAGE;
+            const paginatedData = filteredTasks.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
             container.innerHTML = `
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800">Tugas Kelas</h2>
-                        <p class="text-sm text-gray-500">Informasi dan instruksi tugas harian</p>
+                        <p class="text-sm text-gray-500">${currentUser.role === 'guru' ? `Tugas Anda pada Mata Pelajaran: ${currentUser.mapel}` : 'Informasi dan instruksi tugas harian'}</p>
                     </div>
                     ${isAdmin ? `<button onclick="openFormTugas()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"><i class="fas fa-plus mr-1"></i> Tambah Tugas</button>` : ''}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    ${dbTasks.length === 0 ? `<div class="col-span-full text-center p-8 bg-gray-50 rounded-lg border border-dashed"><p class="text-gray-500">Belum ada tugas saat ini.</p></div>` : ''}
-                    ${dbTasks.map(t => `
+                    ${paginatedData.length === 0 ? `<div class="col-span-full text-center p-8 bg-gray-50 rounded-lg border border-dashed"><p class="text-gray-500">Belum ada tugas saat ini.</p></div>` : ''}
+                    ${paginatedData.map(t => `
                         <div class="border rounded-xl p-5 bg-white shadow-sm border-l-4 border-l-blue-500 relative flex flex-col h-full">
                             ${isAdmin ? `<button onclick="hapusTugas('${t.id}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors" title="Hapus Tugas"><i class="fas fa-trash-alt"></i></button>` : ''}
                             <div class="flex items-center gap-2 mb-3">
@@ -618,24 +714,31 @@
                         </div>
                     `).join('')}
                 </div>
+                ${renderPaginationUI(filteredTasks.length, pageTugas, 'gantiPageTugas')}
             `;
         }
 
         function openFormTugas() {
+            // Jika role Guru, kita default value ke mapel guru, dan kunci (disabled) dropdownnya
+            const isGuru = currentUser.role === 'guru';
+            const guruMapel = currentUser.mapel;
+
             showModal({
                 title: 'Tambah Tugas Baru',
                 body: `
                     <form id="form-tambah-tugas" class="space-y-4">
                         <div><label class="block text-sm text-gray-700 mb-1">Tanggal</label><input type="date" id="t-tanggal" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required></div>
                         <div><label class="block text-sm text-gray-700 mb-1">Mata Pelajaran</label>
-                        <select id="t-mapel" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required>
+                        <select id="t-mapel" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required ${isGuru ? 'disabled' : ''}>
                             <option value="">Pilih Mata Pelajaran...</option>
-                            <option value="Matematika">Matematika</option>
-                            <option value="Bahasa Indonesia">Bahasa Indonesia</option>
-                            <option value="Bahasa Inggris">Bahasa Inggris</option>
-                            <option value="IPA">IPA</option>
-                            <option value="IPS">IPS</option>
-                        </select></div>
+                            <option value="Matematika" ${isGuru && guruMapel === 'Matematika' ? 'selected' : ''}>Matematika</option>
+                            <option value="Bahasa Indonesia" ${isGuru && guruMapel === 'Bahasa Indonesia' ? 'selected' : ''}>Bahasa Indonesia</option>
+                            <option value="Bahasa Inggris" ${isGuru && guruMapel === 'Bahasa Inggris' ? 'selected' : ''}>Bahasa Inggris</option>
+                            <option value="IPA" ${isGuru && guruMapel === 'IPA' ? 'selected' : ''}>IPA</option>
+                            <option value="IPS" ${isGuru && guruMapel === 'IPS' ? 'selected' : ''}>IPS</option>
+                        </select>
+                        ${isGuru ? `<p class="text-xs text-gray-500 mt-1">Dikunci sesuai bidang studi Anda.</p>` : ''}
+                        </div>
                         <div><label class="block text-sm text-gray-700 mb-1">Judul Tugas</label><input type="text" id="t-judul" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Cth: Latihan Halaman 12"></div>
                         <div><label class="block text-sm text-gray-700 mb-1">Instruksi</label><textarea id="t-instruksi" rows="3" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Berikan instruksi detail..."></textarea></div>
                         <div><label class="block text-sm text-gray-700 mb-1">File Lampiran PDF/Gambar (Max 2MB)</label>
@@ -681,8 +784,18 @@
             });
         }
 
+        function gantiPageAkun(page) {
+            pageAkun = page;
+            renderAkun();
+        }
+
         function renderAkun() {
             const container = document.getElementById('view-container');
+            
+            // Paginasi Data Akun
+            const startIndex = (pageAkun - 1) * ITEMS_PER_PAGE;
+            const paginatedData = dbUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
             container.innerHTML = `
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
@@ -706,17 +819,19 @@
                                 <th class="px-4 py-3">Username</th>
                                 <th class="px-4 py-3">Role</th>
                                 <th class="px-4 py-3">NIS</th>
+                                <th class="px-4 py-3">Mata Pelajaran</th>
                                 <th class="px-4 py-3 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${dbUsers.length === 0 ? `<tr><td colspan="5" class="text-center py-4 text-gray-500">Belum ada data user.</td></tr>` : ''}
-                            ${dbUsers.map(u => `
+                            ${paginatedData.length === 0 ? `<tr><td colspan="6" class="text-center py-4 text-gray-500">Belum ada data user.</td></tr>` : ''}
+                            ${paginatedData.map(u => `
                                 <tr class="bg-white border-b hover:bg-gray-50">
                                     <td class="px-4 py-3 font-medium text-gray-900">${u.nama_lengkap}</td>
                                     <td class="px-4 py-3 text-gray-600">${u.username}</td>
                                     <td class="px-4 py-3"><span class="px-2 py-1 ${u.role === 'admin' ? 'bg-red-100 text-red-700' : (u.role === 'guru' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700')} rounded text-xs font-semibold capitalize">${u.role}</span></td>
                                     <td class="px-4 py-3 text-gray-600">${u.nis || '-'}</td>
+                                    <td class="px-4 py-3 text-gray-600">${u.role === 'guru' ? `<span class="font-semibold text-gray-800">${u.mapel}</span>` : '-'}</td>
                                     <td class="px-4 py-3 text-center">
                                         ${u.username !== 'admin' && currentUser.username !== u.username ? `
                                         <button onclick="hapusUser('${u.id}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition-colors" title="Hapus Akun">
@@ -728,6 +843,7 @@
                         </tbody>
                     </table>
                 </div>
+                ${renderPaginationUI(dbUsers.length, pageAkun, 'gantiPageAkun')}
             `;
         }
 
@@ -738,7 +854,7 @@
                     <form id="form-tambah-user" class="space-y-4">
                         <div>
                             <label class="block text-sm text-gray-700 mb-1">Peran (Role)</label>
-                            <select id="u-role" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required>
+                            <select id="u-role" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required onchange="document.getElementById('div-mapel').style.display = this.value === 'guru' ? 'block' : 'none';">
                                 <option value="siswa">Siswa</option>
                                 <option value="guru">Guru / Wali Kelas</option>
                             </select>
@@ -750,6 +866,17 @@
                         <div>
                             <label class="block text-sm text-gray-700 mb-1">NIS (Hanya untuk Siswa)</label>
                             <input type="text" id="u-nis" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Kosongkan jika Guru">
+                        </div>
+                        <div id="div-mapel" style="display: none;">
+                            <label class="block text-sm text-gray-700 mb-1">Mata Pelajaran (Hanya untuk Guru)</label>
+                            <select id="u-mapel" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Pilih Mapel...</option>
+                                <option value="Matematika">Matematika</option>
+                                <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                                <option value="Bahasa Inggris">Bahasa Inggris</option>
+                                <option value="IPA">IPA</option>
+                                <option value="IPS">IPS</option>
+                            </select>
                         </div>
                         <hr class="my-2 border-gray-200">
                         <div>
@@ -767,14 +894,16 @@
                     const role = document.getElementById('u-role').value;
                     const nama = document.getElementById('u-nama').value;
                     const nis = document.getElementById('u-nis').value;
+                    const mapel = document.getElementById('u-mapel').value;
                     const username = document.getElementById('u-username').value;
                     const password = document.getElementById('u-password').value;
 
                     if(!nama || !username || !password) { showToast('Nama, Username, dan Password wajib diisi!', 'error'); return; }
+                    if(role === 'guru' && !mapel) { showToast('Mata Pelajaran wajib dipilih untuk akun Guru!', 'error'); return; }
 
                     hideModal(); showLoading('Menambahkan akun baru...');
                     try {
-                        await fetchAPI('save_user', { role: role, nama_lengkap: nama, nis: nis, username: username, password: password });
+                        await fetchAPI('save_user', { role: role, nama_lengkap: nama, nis: nis, mapel: mapel, username: username, password: password });
                         showToast('Akun berhasil ditambahkan!', 'success'); loadDataForTab();
                     } catch (err) { showToast(err.message, 'error'); hideLoading(); }
                 }
@@ -783,13 +912,13 @@
 
         function downloadTemplateExcel() {
             const ws_data = [
-                ['Role (siswa/guru)', 'Nama Lengkap', 'NIS (Hanya Siswa)', 'Username', 'Password'],
-                ['siswa', 'Budi Santoso', '1001', 'budi01', 'rahasia123'],
-                ['guru', 'Siti Aminah', '', 'sitiguru', 'guruHebat456']
+                ['Role (siswa/guru)', 'Nama Lengkap', 'NIS (Hanya Siswa)', 'Username', 'Password', 'Mapel (Khusus Guru)'],
+                ['siswa', 'Budi Santoso', '1001', 'budi01', 'rahasia123', ''],
+                ['guru', 'Siti Aminah', '', 'sitiguru', 'guruHebat456', 'IPA']
             ];
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
             
-            ws['!cols'] = [{wch: 18}, {wch: 25}, {wch: 18}, {wch: 15}, {wch: 15}];
+            ws['!cols'] = [{wch: 18}, {wch: 25}, {wch: 18}, {wch: 15}, {wch: 15}, {wch: 20}];
             
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Template_User");
@@ -842,7 +971,8 @@
                                 nama_lengkap: (row['Nama Lengkap'] || '').toString(),
                                 nis: (row['NIS (Hanya Siswa)'] || '').toString(),
                                 username: (row['Username'] || '').toString(),
-                                password: (row['Password'] || '').toString()
+                                password: (row['Password'] || '').toString(),
+                                mapel: (row['Mapel (Khusus Guru)'] || '').toString()
                             }));
 
                             if(users.length === 0) {
