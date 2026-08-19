@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jurnal Belajar PJJ - Kelas IX-D (Production)</title>
+    <title>Jurnal Belajar PJJ - Kelas IX-D</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -11,20 +11,18 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- Library SheetJS untuk membaca dan membuat Excel di sisi klien -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        
-        /* Z-Index Hierarchy Wajib */
         #loading-overlay { z-index: 9999; }
         #toast-container { z-index: 2000; }
         .modal-overlay { z-index: 1000; }
-        
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%;
@@ -40,7 +38,7 @@
     <!-- LOADING OVERLAY -->
     <div id="loading-overlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm hidden flex-col justify-center items-center">
         <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-3"></div>
-        <p id="loading-text" class="text-blue-700 font-medium">Memproses data...</p>
+        <p id="loading-text" class="text-blue-700 font-medium text-center px-4">Memproses data...</p>
     </div>
 
     <!-- TOAST CONTAINER -->
@@ -125,10 +123,9 @@
          * ============================================================
          * WAJIB DIUBAH!
          * Ganti URL di bawah dengan URL Web App Apps Script Anda 
-         * setelah di-deploy.
          * ============================================================
          */
-        const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLamytNjZJ_0NGO5l7-UB3iBJQak-QErWqd6dQ-whlsQENXi1TdaiKwEYYZJ3966fL/exec"; // CONTOH URL. GANTI SETELAH DEPLOY!
+        const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyC4LqZcQ5B8Q-zY_G0P-r6Cg7r5QpS9O5L2E_aN7sXW-M8VjF4K6P9lU-H1x8zC-bFhw/exec"; 
 
         let currentUser = null;
         let sessionToken = null;
@@ -137,12 +134,8 @@
         
         let dbJournals = [];
         let dbTasks = [];
+        let dbUsers = []; 
 
-        /**
-         * ==========================================
-         * CORE API SERVICE
-         * ==========================================
-         */
         async function fetchAPI(action, payload = {}) {
             try {
                 if (sessionToken) payload.sessionToken = sessionToken;
@@ -162,11 +155,6 @@
             }
         }
 
-        /**
-         * ==========================================
-         * UTILITIES UI
-         * ==========================================
-         */
         function showLoading(text = 'Memproses data...') {
             document.getElementById('loading-text').innerText = text;
             document.getElementById('loading-overlay').classList.remove('hidden');
@@ -198,7 +186,7 @@
             document.getElementById('modal-body').innerHTML = body;
             const btnConfirm = document.getElementById('modal-btn-confirm');
             btnConfirm.innerText = confirmText;
-            btnConfirm.className = `px-4 py-2 text-white ${confirmColor} hover:opacity-90 rounded-lg transition-colors font-medium`;
+            btnConfirm.className = `px-4 py-2 text-white ${confirmColor} hover:opacity-90 rounded-lg transition-colors font-medium whitespace-nowrap`;
             document.getElementById('modal-btn-cancel').innerText = cancelText;
             const modal = document.getElementById('global-modal');
             const content = document.getElementById('modal-content-box');
@@ -224,11 +212,6 @@
             document.getElementById('viewer-img').src = '';
         }
 
-        /**
-         * ==========================================
-         * AUTHENTICATION & INITIALIZATION
-         * ==========================================
-         */
         async function handleLogin(e) {
             e.preventDefault();
             const userIn = document.getElementById('username').value;
@@ -312,7 +295,7 @@
             showLoading('Mengambil data terbaru...');
             try {
                 if (currentTab === 'jurnal' && currentUser.role === 'siswa') {
-                    dbJournals = await fetchAPI('get_my_journals');
+                    dbJournals = await fetchAPI('get_my_journals', { user_id: currentUser.id });
                     renderJurnalSiswa();
                 } else if (currentTab === 'rekap') {
                     dbJournals = await fetchAPI('get_all_journals');
@@ -321,6 +304,7 @@
                     dbTasks = await fetchAPI('get_tasks');
                     renderTugasKelas();
                 } else if (currentTab === 'akun') {
+                    dbUsers = await fetchAPI('get_users');
                     renderAkun();
                 }
             } catch (err) {
@@ -330,11 +314,6 @@
             }
         }
 
-        /**
-         * ==========================================
-         * FILE HANDLING UTILITIES
-         * ==========================================
-         */
         function getBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -344,11 +323,6 @@
             });
         }
 
-        /**
-         * ==========================================
-         * RENDER VIEWS
-         * ==========================================
-         */
         function renderJurnalSiswa() {
             const container = document.getElementById('view-container');
             container.innerHTML = `
@@ -447,26 +421,27 @@
                     const ftoInput = document.getElementById('j-foto');
 
                     if(!tgl || !mpl || !mtr || ftoInput.files.length === 0) {
-                        showToast('Harap lengkapi semua form dan unggah foto!', 'error');
-                        return;
+                        showToast('Harap lengkapi semua form dan unggah foto!', 'error'); return;
                     }
 
                     const file = ftoInput.files[0];
                     if (file.size > 2 * 1024 * 1024) { showToast('Ukuran file maksimal 2MB!', 'error'); return; }
 
                     hideModal();
-                    showLoading('Menyimpan Jurnal & Mengunggah Foto ke Drive...');
+                    showLoading('Menyimpan Jurnal & Mengunggah Foto...');
                     
                     try {
                         const base64String = await getBase64(file);
                         const payload = {
+                            id_siswa: currentUser.id, 
+                            nama_siswa: currentUser.nama,
                             tanggal: tgl, mapel: mpl, materi: mtr, pemahaman: phm,
                             filename: file.name, mimeType: file.type, base64: base64String
                         };
                         
                         await fetchAPI('save_journal', payload);
                         showToast('Jurnal dan bukti berhasil disimpan!', 'success');
-                        loadDataForTab(); // Refresh data
+                        loadDataForTab();
                     } catch (err) {
                         showToast('Gagal menyimpan jurnal: ' + err.message, 'error');
                         hideLoading();
@@ -559,10 +534,7 @@
             `;
         }
 
-        function applyFilterMapel(val) {
-            currentFilterMapel = val;
-            renderRekapJurnal(); 
-        }
+        function applyFilterMapel(val) { currentFilterMapel = val; renderRekapJurnal(); }
 
         function beriKomentar(jurnalId) {
             const jurnal = dbJournals.find(j => j.id === jurnalId);
@@ -583,11 +555,8 @@
                     try {
                         await fetchAPI('update_comment', { id_jurnal: jurnalId, komentar: kom });
                         showToast('Komentar berhasil disimpan', 'success');
-                        loadDataForTab(); // Refresh
-                    } catch (err) {
-                        showToast('Gagal: ' + err.message, 'error');
-                        hideLoading();
-                    }
+                        loadDataForTab(); 
+                    } catch (err) { showToast('Gagal: ' + err.message, 'error'); hideLoading(); }
                 }
             });
         }
@@ -606,11 +575,8 @@
                         titleSuffix = ` - ${currentFilterMapel}`;
                     }
 
-                    doc.setFontSize(16);
-                    doc.text(`Rekap Jurnal Belajar${titleSuffix}`, 14, 15);
-                    doc.setFontSize(11);
-                    doc.text("Kelas: IX-D | SMP Negeri 2 Ende", 14, 22);
-                    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 28);
+                    doc.setFontSize(16); doc.text(`Rekap Jurnal Belajar${titleSuffix}`, 14, 15);
+                    doc.setFontSize(11); doc.text("Kelas: IX-D | SMP Negeri 2 Ende", 14, 22); doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 28);
 
                     const tableData = exportData.map(j => [j.tanggal, j.nama_siswa, j.mapel, j.materi, `${j.pemahaman}%`, j.komentar || '-']);
                     doc.autoTable({
@@ -619,54 +585,35 @@
                     });
                     doc.save(`Rekap_Jurnal${titleSuffix ? '_' + currentFilterMapel : ''}.pdf`);
                     showToast('File PDF berhasil diunduh', 'success');
-                } catch (err) {
-                    showToast('Gagal membuat PDF', 'error');
-                } finally {
-                    hideLoading();
-                }
+                } catch (err) { showToast('Gagal membuat PDF', 'error'); } finally { hideLoading(); }
             }, 500);
         }
 
         function renderTugasKelas() {
             const container = document.getElementById('view-container');
             const isAdmin = currentUser.role === 'admin' || currentUser.role === 'guru';
-            
             container.innerHTML = `
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800">Tugas Kelas</h2>
                         <p class="text-sm text-gray-500">Informasi dan instruksi tugas harian</p>
                     </div>
-                    ${isAdmin ? `
-                    <button onclick="openFormTugas()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                        <i class="fas fa-plus mr-1"></i> Tambah Tugas
-                    </button>
-                    ` : ''}
+                    ${isAdmin ? `<button onclick="openFormTugas()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"><i class="fas fa-plus mr-1"></i> Tambah Tugas</button>` : ''}
                 </div>
-
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     ${dbTasks.length === 0 ? `<div class="col-span-full text-center p-8 bg-gray-50 rounded-lg border border-dashed"><p class="text-gray-500">Belum ada tugas saat ini.</p></div>` : ''}
                     ${dbTasks.map(t => `
                         <div class="border rounded-xl p-5 bg-white shadow-sm border-l-4 border-l-blue-500 relative flex flex-col h-full">
-                            ${isAdmin ? `
-                            <button onclick="hapusTugas('${t.id}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors" title="Hapus Tugas">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                            ` : ''}
+                            ${isAdmin ? `<button onclick="hapusTugas('${t.id}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors" title="Hapus Tugas"><i class="fas fa-trash-alt"></i></button>` : ''}
                             <div class="flex items-center gap-2 mb-3">
                                 <span class="text-xs font-semibold px-2 py-1 bg-gray-100 text-gray-700 rounded"><i class="far fa-calendar-alt"></i> ${t.tanggal}</span>
                                 <span class="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded">${t.mapel}</span>
                             </div>
                             <h3 class="font-bold text-gray-800 mb-2">${t.judul}</h3>
                             <p class="text-sm text-gray-600 mb-4 flex-grow whitespace-pre-line">${t.instruksi}</p>
-                            
                             <div class="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
                                 <span class="text-xs font-bold text-green-600"><i class="fas fa-circle text-[8px] align-middle mr-1"></i> Aktif</span>
-                                ${t.lampiran ? `
-                                <a href="${t.lampiran}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
-                                    <i class="fas fa-paperclip"></i> Lihat Lampiran
-                                </a>
-                                ` : ''}
+                                ${t.lampiran ? `<a href="${t.lampiran}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1"><i class="fas fa-paperclip"></i> Lampiran</a>` : ''}
                             </div>
                         </div>
                     `).join('')}
@@ -679,8 +626,7 @@
                 title: 'Tambah Tugas Baru',
                 body: `
                     <form id="form-tambah-tugas" class="space-y-4">
-                        <div><label class="block text-sm text-gray-700 mb-1">Tanggal</label>
-                        <input type="date" id="t-tanggal" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">Tanggal</label><input type="date" id="t-tanggal" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required></div>
                         <div><label class="block text-sm text-gray-700 mb-1">Mata Pelajaran</label>
                         <select id="t-mapel" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required>
                             <option value="">Pilih Mata Pelajaran...</option>
@@ -690,11 +636,9 @@
                             <option value="IPA">IPA</option>
                             <option value="IPS">IPS</option>
                         </select></div>
-                        <div><label class="block text-sm text-gray-700 mb-1">Judul Tugas</label>
-                        <input type="text" id="t-judul" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Cth: Latihan Halaman 12"></div>
-                        <div><label class="block text-sm text-gray-700 mb-1">Instruksi</label>
-                        <textarea id="t-instruksi" rows="3" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Berikan instruksi detail kepada siswa..."></textarea></div>
-                        <div><label class="block text-sm text-gray-700 mb-1">File Lampiran PDF/Gambar (Opsional, Max 2MB)</label>
+                        <div><label class="block text-sm text-gray-700 mb-1">Judul Tugas</label><input type="text" id="t-judul" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Cth: Latihan Halaman 12"></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">Instruksi</label><textarea id="t-instruksi" rows="3" class="w-full border rounded-lg p-2 outline-none focus:border-blue-500" required placeholder="Berikan instruksi detail..."></textarea></div>
+                        <div><label class="block text-sm text-gray-700 mb-1">File Lampiran PDF/Gambar (Max 2MB)</label>
                         <div class="border border-gray-300 rounded-lg p-2 flex items-center gap-2 bg-gray-50">
                             <input type="file" id="t-file" accept=".pdf,image/*" class="text-sm w-full file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
                         </div></div>
@@ -714,46 +658,25 @@
                     if(fileInput.files.length > 0) {
                         const file = fileInput.files[0];
                         if (file.size > 2 * 1024 * 1024) { showToast('Ukuran file maksimal 2MB!', 'error'); return; }
-                        base64String = await getBase64(file);
-                        filename = file.name;
-                        mimeType = file.type;
+                        base64String = await getBase64(file); filename = file.name; mimeType = file.type;
                     }
 
-                    hideModal();
-                    showLoading(base64String ? 'Menyimpan tugas dan upload lampiran...' : 'Menyimpan tugas...');
-                    
+                    hideModal(); showLoading(base64String ? 'Menyimpan & upload lampiran...' : 'Menyimpan tugas...');
                     try {
-                        await fetchAPI('save_task', {
-                            tanggal: tgl, mapel: mpl, judul: jdl, instruksi: ins,
-                            filename: filename, mimeType: mimeType, base64: base64String
-                        });
-                        showToast('Tugas berhasil ditambahkan', 'success');
-                        loadDataForTab();
-                    } catch (err) {
-                        showToast('Gagal menyimpan tugas: ' + err.message, 'error');
-                        hideLoading();
-                    }
+                        await fetchAPI('save_task', { tanggal: tgl, mapel: mpl, judul: jdl, instruksi: ins, filename: filename, mimeType: mimeType, base64: base64String });
+                        showToast('Tugas berhasil ditambahkan', 'success'); loadDataForTab();
+                    } catch (err) { showToast('Gagal menyimpan tugas: ' + err.message, 'error'); hideLoading(); }
                 }
             });
         }
 
         function hapusTugas(id) {
             showModal({
-                title: 'Hapus Tugas',
-                body: 'Apakah Anda yakin ingin menghapus tugas ini secara permanen?',
-                confirmText: 'Ya, Hapus',
-                confirmColor: 'bg-red-600',
+                title: 'Hapus Tugas', body: 'Apakah Anda yakin ingin menghapus tugas ini secara permanen?', confirmText: 'Ya, Hapus', confirmColor: 'bg-red-600',
                 onConfirm: async () => {
-                    hideModal();
-                    showLoading('Menghapus...');
-                    try {
-                        await fetchAPI('delete_task', { id_tugas: id });
-                        showToast('Tugas berhasil dihapus', 'success');
-                        loadDataForTab();
-                    } catch (err) {
-                        showToast('Gagal menghapus: ' + err.message, 'error');
-                        hideLoading();
-                    }
+                    hideModal(); showLoading('Menghapus...');
+                    try { await fetchAPI('delete_task', { id_tugas: id }); showToast('Tugas berhasil dihapus', 'success'); loadDataForTab(); } 
+                    catch (err) { showToast('Gagal menghapus: ' + err.message, 'error'); hideLoading(); }
                 }
             });
         }
@@ -761,12 +684,199 @@
         function renderAkun() {
             const container = document.getElementById('view-container');
             container.innerHTML = `
-                <div class="text-center py-12">
-                    <i class="fas fa-tools text-6xl text-gray-300 mb-4"></i>
-                    <h2 class="text-xl font-bold text-gray-700">Modul Kelola Akun</h2>
-                    <p class="text-gray-500 max-w-md mx-auto mt-2">Untuk pengelolaan User (Siswa/Guru), silakan kelola langsung secara terpusat melalui Google Sheets Anda di tab <strong>Users</strong> untuk performa yang lebih aman dan mudah direkapitulasi secara massal.</p>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Kelola Akun</h2>
+                        <p class="text-sm text-gray-500">Tambah dan hapus akun Siswa atau Guru</p>
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button onclick="openFormUploadMassal()" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
+                            <i class="fas fa-file-excel mr-1"></i> Upload Massal
+                        </button>
+                        <button onclick="openFormUser()" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
+                            <i class="fas fa-plus mr-1"></i> Tambah User
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3">Nama Lengkap</th>
+                                <th class="px-4 py-3">Username</th>
+                                <th class="px-4 py-3">Role</th>
+                                <th class="px-4 py-3">NIS</th>
+                                <th class="px-4 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${dbUsers.length === 0 ? `<tr><td colspan="5" class="text-center py-4 text-gray-500">Belum ada data user.</td></tr>` : ''}
+                            ${dbUsers.map(u => `
+                                <tr class="bg-white border-b hover:bg-gray-50">
+                                    <td class="px-4 py-3 font-medium text-gray-900">${u.nama_lengkap}</td>
+                                    <td class="px-4 py-3 text-gray-600">${u.username}</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 ${u.role === 'admin' ? 'bg-red-100 text-red-700' : (u.role === 'guru' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700')} rounded text-xs font-semibold capitalize">${u.role}</span></td>
+                                    <td class="px-4 py-3 text-gray-600">${u.nis || '-'}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        ${u.username !== 'admin' && currentUser.username !== u.username ? `
+                                        <button onclick="hapusUser('${u.id}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition-colors" title="Hapus Akun">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>` : '<span class="text-xs text-gray-400">Default</span>'}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 </div>
             `;
+        }
+
+        function openFormUser() {
+            showModal({
+                title: 'Tambah Akun Baru',
+                body: `
+                    <form id="form-tambah-user" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">Peran (Role)</label>
+                            <select id="u-role" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required>
+                                <option value="siswa">Siswa</option>
+                                <option value="guru">Guru / Wali Kelas</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">Nama Lengkap</label>
+                            <input type="text" id="u-nama" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required placeholder="Contoh: Budi Santoso">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">NIS (Hanya untuk Siswa)</label>
+                            <input type="text" id="u-nis" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Kosongkan jika Guru">
+                        </div>
+                        <hr class="my-2 border-gray-200">
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">Username (Untuk Login)</label>
+                            <input type="text" id="u-username" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required placeholder="Gunakan huruf kecil tanpa spasi">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">Password</label>
+                            <input type="password" id="u-password" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required placeholder="Minimal 6 karakter">
+                        </div>
+                    </form>
+                `,
+                confirmText: 'Buat Akun',
+                onConfirm: async () => {
+                    const role = document.getElementById('u-role').value;
+                    const nama = document.getElementById('u-nama').value;
+                    const nis = document.getElementById('u-nis').value;
+                    const username = document.getElementById('u-username').value;
+                    const password = document.getElementById('u-password').value;
+
+                    if(!nama || !username || !password) { showToast('Nama, Username, dan Password wajib diisi!', 'error'); return; }
+
+                    hideModal(); showLoading('Menambahkan akun baru...');
+                    try {
+                        await fetchAPI('save_user', { role: role, nama_lengkap: nama, nis: nis, username: username, password: password });
+                        showToast('Akun berhasil ditambahkan!', 'success'); loadDataForTab();
+                    } catch (err) { showToast(err.message, 'error'); hideLoading(); }
+                }
+            });
+        }
+
+        function downloadTemplateExcel() {
+            const ws_data = [
+                ['Role (siswa/guru)', 'Nama Lengkap', 'NIS (Hanya Siswa)', 'Username', 'Password'],
+                ['siswa', 'Budi Santoso', '1001', 'budi01', 'rahasia123'],
+                ['guru', 'Siti Aminah', '', 'sitiguru', 'guruHebat456']
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            
+            ws['!cols'] = [{wch: 18}, {wch: 25}, {wch: 18}, {wch: 15}, {wch: 15}];
+            
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Template_User");
+            XLSX.writeFile(wb, "Template_Upload_User.xlsx");
+        }
+
+        function openFormUploadMassal() {
+            showModal({
+                title: 'Upload Akun Massal',
+                body: `
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-600 mb-2">1. Download template Excel dan isi datanya.</p>
+                        <button onclick="downloadTemplateExcel()" class="bg-green-100 text-green-700 hover:bg-green-200 font-medium px-3 py-1.5 rounded text-sm transition-colors w-full flex items-center justify-center gap-2">
+                            <i class="fas fa-download"></i> Download Template Excel
+                        </button>
+                    </div>
+                    <hr class="my-4 border-gray-200">
+                    <div>
+                        <p class="text-sm text-gray-600 mb-2">2. Upload file Excel yang sudah diisi.</p>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors">
+                            <input type="file" id="u-file-excel" accept=".xlsx, .xls" class="hidden" onchange="document.getElementById('excel-file-name').innerText = this.files[0].name" required>
+                            <label for="u-file-excel" class="cursor-pointer flex flex-col items-center">
+                                <i class="fas fa-file-excel text-3xl text-green-500 mb-2"></i>
+                                <span class="text-sm text-blue-600 font-medium">Klik untuk pilih file Excel</span>
+                                <span id="excel-file-name" class="text-xs text-gray-500 mt-1">Belum ada file</span>
+                            </label>
+                        </div>
+                    </div>
+                `,
+                confirmText: 'Proses Upload',
+                confirmColor: 'bg-green-600',
+                onConfirm: () => {
+                    const fileInput = document.getElementById('u-file-excel');
+                    if (fileInput.files.length === 0) {
+                        showToast('Pilih file Excel terlebih dahulu!', 'error'); return;
+                    }
+
+                    const file = fileInput.files[0];
+                    const reader = new FileReader();
+
+                    reader.onload = async function(e) {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, {type: 'array'});
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const jsonData = XLSX.utils.sheet_to_json(firstSheet, {defval: ""});
+
+                            const users = jsonData.map(row => ({
+                                role: (row['Role (siswa/guru)'] || '').toString(),
+                                nama_lengkap: (row['Nama Lengkap'] || '').toString(),
+                                nis: (row['NIS (Hanya Siswa)'] || '').toString(),
+                                username: (row['Username'] || '').toString(),
+                                password: (row['Password'] || '').toString()
+                            }));
+
+                            if(users.length === 0) {
+                                showToast('Tidak ada data yang terbaca di file Excel', 'error'); return;
+                            }
+
+                            hideModal(); 
+                            showLoading('Memproses massal data akun...');
+                            
+                            const resMsg = await fetchAPI('save_users_bulk', { users: users });
+                            showToast(resMsg || 'Upload massal sukses', 'success');
+                            loadDataForTab();
+                        } catch (err) {
+                            hideLoading();
+                            showToast('Gagal memproses file: ' + err.message, 'error');
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            });
+        }
+
+        function hapusUser(id) {
+            showModal({
+                title: 'Hapus Akun',
+                body: 'Apakah Anda yakin ingin menghapus akun ini secara permanen? Data jurnal yang sudah diinput oleh akun ini akan tetap tersimpan.',
+                confirmText: 'Hapus Akun',
+                confirmColor: 'bg-red-600',
+                onConfirm: async () => {
+                    hideModal(); showLoading('Menghapus...');
+                    try { await fetchAPI('delete_user', { id_user: id }); showToast('Akun berhasil dihapus', 'success'); loadDataForTab(); } 
+                    catch (err) { showToast('Gagal menghapus: ' + err.message, 'error'); hideLoading(); }
+                }
+            });
         }
     </script>
 </body>
